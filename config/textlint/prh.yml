@@ -1,0 +1,10 @@
+version: 1
+rules:
+  - expected: IQON
+    pattern:
+      - iqon
+      - iQON
+  - expected: VASILY
+    pattern:
+      - vasily
+      - Vasily
