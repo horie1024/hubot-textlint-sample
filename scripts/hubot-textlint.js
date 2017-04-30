@@ -5,8 +5,8 @@ const engine = new TextLintEngine({
 
 const severityLevel = ["info", "warning", "error"];
 
-const Qiita = require('../libs/Qiita');
-const qiita = new Qiita({team: 'vasily', token: process.env.YOUR_QIITA_TOKEN});
+const Qiita = require("../libs/Qiita");
+const qiita = new Qiita({team: "vasily", token: process.env.YOUR_QIITA_TOKEN});
 
 module.exports = robot => {
 
@@ -26,25 +26,51 @@ module.exports = robot => {
         engine.executeOnText(item.raw_body, ".md").then(results => {
 
           return new Promise(resolve => {
+
             if (engine.isErrorResults(results)) {
-              let output = `@${item.user.url_name} 文章校正の結果です:+1:\n\n\`\`\`\n` + results[0].messages.map(message => {
-                return ` ${message.line}:${message.column} ${severityLevel[message.severity]} ${message.message}  ${message.ruleId}\n`;
-              })
-              .reduce((previous, current, index, array) => {
+              resolve(results[0].messages);
+            } else {
+              resolve([]);
+            }
+          });
+        }).then(messages => {
+
+          return new Promise(resolve => {
+
+            if (messages.length > 0) {
+              let lines = item.raw_body.split("\n").map(line => { return line + "\n" }),
+                  _output = [];
+
+              _output.push(`@${item.user.url_name} 文章校正の結果です:+1:\n`);
+              messages.map(msg => {
+                _output.push(`## [${severityLevel[msg.severity]}] ${msg.message}\n`);
+                _output.push("\n");
+                _output.push(`> ${lines[msg.line - 1]}\n`);
+                _output.push("\n");
+                _output.push("\`\`\`\n");
+                _output.push(formatMessage(msg));
+                _output.push("\`\`\`\n");
+                _output.push("\n");
+              });
+
+              let output = _output.reduce((previous, current, index, array) => {
                 return previous + current;
-              }) + `\`\`\``;
+              });
 
               resolve(output);
+
             } else {
               resolve("");
             }
           });
+
         }).then(output => {
 
           qiita.Comments.list(item.uuid).then(res => {
 
             let comment = res.find && res.find((element, index, array) => {
-              return element.body.includes("文章校正の結果です");
+              return element.body.includes("文章校正の結果です") ||
+                     element.body.includes("エラーはありません:tada:");
             });
 
             // If already commented on.
@@ -69,3 +95,7 @@ module.exports = robot => {
     res.end();
   });
 }
+
+let formatMessage = msg => {
+  return ` ${msg.line}:${msg.column} ${severityLevel[msg.severity]} ${msg.message}  ${msg.ruleId}\n`
+};
